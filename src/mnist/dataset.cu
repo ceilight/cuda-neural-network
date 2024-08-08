@@ -1,12 +1,12 @@
 ﻿#include <dataset.cuh>
 #include <utils.cuh>
 
-#include <thrust/system/cuda/experimental/pinned_allocator.h>
-
 #include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <random>
+
+#include <thrust/host_vector.h>
 
 DataSet::DataSet(std::string mnist_data_path, bool shuffle)
     : shuffle(shuffle), train_data_index(0), test_data_index(0) {
@@ -58,9 +58,7 @@ void DataSet::forward(int batch_size, bool is_train) {
     int im_stride = 1 * this->height * this->width;
     int one_hot_stride = 10;
 
-    thrust::host_vector<
-        float, thrust::system::cuda::experimental::pinned_allocator<float>>
-        train_data_buffer;
+    thrust::host_vector<float> train_data_buffer;
     train_data_buffer.reserve(size * im_stride);
 
     for (int i = start; i < end; i++) {
@@ -91,9 +89,7 @@ void DataSet::forward(int batch_size, bool is_train) {
     int im_stride = 1 * this->height * this->width;
     int one_hot_stride = 10;
 
-    thrust::host_vector<
-        float, thrust::system::cuda::experimental::pinned_allocator<float>>
-        test_data_buffer;
+    thrust::host_vector<float> test_data_buffer;
     test_data_buffer.reserve(size * im_stride);
 
     for (int i = start; i < end; i++) {

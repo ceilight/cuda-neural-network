@@ -1,5 +1,3 @@
-#pragma once
-
 #include <layer.cuh>
 #include <storage.cuh>
 #include <utils.cuh>

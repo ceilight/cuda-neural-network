@@ -5,8 +5,6 @@
 #include <string>
 #include <unordered_map>
 
-#include <thrust/system/cuda/experimental/pinned_allocator.h>
-
 #include <blas.cuh>
 #include <conv.cuh>
 #include <dataset.cuh>
@@ -18,6 +16,8 @@
 #include <rmsprop.cuh>
 #include <softmax.cuh>
 #include <storage.cuh>
+
+#include <thrust/host_vector.h>
 
 class Minist {
  public:
@@ -32,13 +32,9 @@ class Minist {
   void backward();                              // neural network backward
 
   std::pair<int, int> top1_accuracy(
-      const thrust::host_vector<
-          float, thrust::system::cuda::experimental::pinned_allocator<float>>&
-          probs,
+      const thrust::host_vector<float> &probs,
       int cls_size,
-      const thrust::host_vector<
-          float, thrust::system::cuda::experimental::pinned_allocator<float>>&
-          labels);  // top1_accuracy
+      const thrust::host_vector<float> &labels);  // top1_accuracy
 
   // Conv1_5x5     1 * 32
   // MaxPool1_2x2
