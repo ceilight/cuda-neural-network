@@ -68,4 +68,12 @@ class Minist {
   std::unique_ptr<ReLU> fc2_relu;
   std::unique_ptr<LogSoftmax> log_softmax;
   std::unique_ptr<NLLLoss> nll_loss;
+
+#ifdef STATS
+  float load_time;
+  float verify_time;
+  float optim_time;
+  std::vector<float> forward_time;
+  std::vector<float> backward_time;
+#endif
 };

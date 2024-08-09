@@ -1,5 +1,7 @@
 #include <mnist.cuh>
 
+#include <ctime>
+
 #include <thrust/host_vector.h>
 
 Minist::Minist(std::string minst_data_path, float learning_rate, float l2,
@@ -55,6 +57,14 @@ Minist::Minist(std::string minst_data_path, float learning_rate, float l2,
 }
 
 void Minist::train(int epochs, int batch_size) {
+#ifdef STATS
+  load_time = 0;
+  verify_time = 0;
+  optim_time = 0;
+  forward_time.resize(14, 0);
+  backward_time.resize(14, 0);
+#endif
+
   for (int epoch = 0; epoch < epochs; epoch++) {
     int idx = 1;
 
@@ -79,6 +89,21 @@ void Minist::train(int epochs, int batch_size) {
     test(batch_size);
     dataset->reset();
   }
+
+#ifdef STATS
+  std::cout << std::endl;
+  std::cout << "-------------------------------------------" << std::endl;
+  std::cout << "Load: " << load_time / idx << std::endl;
+  for (int i = 0; i < (int)forward_time.size(); i++)
+      std::cout << "Forward #" << i << ": " << forward_time[i] / idx
+                << std::endl;
+  std::cout << "Verify: " << verify_time / idx << std::endl;
+  for (int i = 0; i < (int)backward_time.size(); i++)
+      std::cout << "Backward #" << i << ": " << backward_time[i] / idx
+                << std::endl;
+  std::cout << "Optimize: " << optim_time << std::endl;
+  std::cout << "-------------------------------------------" << std::endl;
+#endif
 }
 
 void Minist::test(int batch_size) {
@@ -90,11 +115,11 @@ void Minist::test(int batch_size) {
     forward(batch_size, false);
     auto acc = top1_accuracy(this->log_softmax->get_output()->get_data(), 10,
                              this->dataset->get_label()->get_data());
-    if (idx % 10 == 0) {
-      std::cout << "Batch: " << idx
-                << ", Test Accuracy: " << (float(acc.first) / acc.second)
-                << std::endl;
-    }
+    // if (idx % 10 == 0) {
+    //   std::cout << "Batch: " << idx
+    //             << ", Test Accuracy: " << (float(acc.first) / acc.second)
+    //             << std::endl;
+    // }
 
     count += acc.first;
     total += acc.second;
@@ -105,9 +130,68 @@ void Minist::test(int batch_size) {
 }
 
 void Minist::forward(int batch_size, bool is_train) {
+#ifdef STATS
+  std::clock_t start;
+
+  start = std::clock();
+#endif
   dataset->forward(batch_size, is_train);
+#ifdef STATS
+  load_time += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+#endif
   const Storage* labels = dataset->get_label();
 
+#ifdef STATS
+  int p = 0;
+  start = std::clock();
+  conv1->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv1_relu->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  max_pool1->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv2->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv2_relu->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  max_pool2->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv3->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv3_relu->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  flatten->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc1->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc1_relu->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc2->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc2_relu->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  log_softmax->forward();
+  forward_time[p++] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+
+  if (is_train) {
+    start = std::clock();
+    nll_loss->forward(labels);
+    verify_time += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  }
+#else
   conv1->forward();
   conv1_relu->forward();
   max_pool1->forward();
@@ -129,9 +213,64 @@ void Minist::forward(int batch_size, bool is_train) {
   log_softmax->forward();
 
   if (is_train) nll_loss->forward(labels);
+#endif
 }
 
 void Minist::backward() {
+
+#ifdef STATS
+  std::clock_t start;
+  start = std::clock();
+  int p = 13;
+#endif
+
+#ifdef STATS
+  start = std::clock();
+  nll_loss->backward();
+  verify_time += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  log_softmax->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc2_relu->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc2->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc1_relu->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  fc1->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  flatten->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv3_relu->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv3->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  max_pool2->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv2_relu->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv2->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  max_pool1->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv1_relu->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+  start = std::clock();
+  conv1->backward();
+  backward_time[p--] += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+#else
   nll_loss->backward();
   log_softmax->backward();
 
@@ -152,6 +291,7 @@ void Minist::backward() {
   max_pool1->backward();
   conv1_relu->backward();
   conv1->backward();
+#endif
 }
 
 std::pair<int, int> Minist::top1_accuracy(
