@@ -5,6 +5,11 @@ if (CMAKE_BUILD_TYPE STREQUAL Debug)
     add_definitions(-DDEBUG)
 endif()
 
+option(STATS "stats" OFF)
+if(STATS)
+    add_definitions(-DSTATS)
+endif()
+
 # option
 option(MNIST "mnist demo" ON)
 option(UNIT_TEST "googletest" OFF)
