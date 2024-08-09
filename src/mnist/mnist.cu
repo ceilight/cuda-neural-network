@@ -71,7 +71,13 @@ void Minist::train(int epochs, int batch_size) {
     while (dataset->has_next(true)) {
       forward(batch_size, true);
       backward();
+#ifdef STATS
+      std::clock_t start = std::clock();
+#endif
       rmsprop->step();
+#ifdef STATS
+      optim_time += (std::clock() - start) / (float)CLOCKS_PER_SEC;
+#endif
 
       if (idx % 10 == 0) {
         float loss = this->nll_loss->get_output()->get_data()[0];
@@ -87,23 +93,22 @@ void Minist::train(int epochs, int batch_size) {
     }
 
     test(batch_size);
+#ifdef STATS
+    std::cout << std::endl;
+    std::cout << "-------------------------------------------" << std::endl;
+    std::cout << "Load: " << load_time / idx << std::endl;
+    for (int i = 0; i < (int)forward_time.size(); i++)
+        std::cout << "Forward #" << i << ": " << forward_time[i] / idx
+                  << std::endl;
+    std::cout << "Verify: " << verify_time / idx << std::endl;
+    for (int i = 0; i < (int)backward_time.size(); i++)
+        std::cout << "Backward #" << i << ": " << backward_time[i] / idx
+                  << std::endl;
+    std::cout << "Optimize: " << optim_time << std::endl;
+    std::cout << "-------------------------------------------" << std::endl;
+#endif
     dataset->reset();
   }
-
-#ifdef STATS
-  std::cout << std::endl;
-  std::cout << "-------------------------------------------" << std::endl;
-  std::cout << "Load: " << load_time / idx << std::endl;
-  for (int i = 0; i < (int)forward_time.size(); i++)
-      std::cout << "Forward #" << i << ": " << forward_time[i] / idx
-                << std::endl;
-  std::cout << "Verify: " << verify_time / idx << std::endl;
-  for (int i = 0; i < (int)backward_time.size(); i++)
-      std::cout << "Backward #" << i << ": " << backward_time[i] / idx
-                << std::endl;
-  std::cout << "Optimize: " << optim_time << std::endl;
-  std::cout << "-------------------------------------------" << std::endl;
-#endif
 }
 
 void Minist::test(int batch_size) {
